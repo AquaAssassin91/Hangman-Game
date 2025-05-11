@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Hangman Game</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      padding: 50px;
+      background: linear-gradient(to right, #83a4d4, #b6fbff);
+      color: #333;
+      overflow-x: hidden;
+    }
+
+    h1 {
+      font-size: 3em;
+      color: #222;
+    }
+
+    #word {
+      font-size: 2em;
+      letter-spacing: 10px;
+      margin: 20px;
+    }
+
+    #letters button {
+      margin: 5px;
+      padding: 10px 15px;
+      font-size: 1em;
+      cursor: pointer;
+      border-radius: 5px;
+      border: none;
+      background-color: #fefefe;
+      box-shadow: 1px 1px 5px rgba(0,0,0,0.2);
+      transition: background-color 0.3s;
+    }
+
+    #letters button:hover:not(:disabled) {
+      background-color: #cce7ff;
+    }
+
+    #letters button:disabled {
+      background-color: #ddd;
+      cursor: not-allowed;
+    }
+
+    #status, #feedback {
+      margin-top: 20px;
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+
+    #play-again {
+      display: none;
+      margin-top: 30px;
+      padding: 12px 25px;
+      font-size: 1.1em;
+      border: none;
+      background-color: #4caf50;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 1px 1px 5px rgba(0,0,0,0.3);
+      transition: background-color 0.3s;
+    }
+
+    #play-again:hover {
+      background-color: #45a049;
+    }
+
+    #popup {
+      display: none;
+      position: fixed;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      border: 3px solid #4caf50;
+      padding: 30px;
+      font-size: 1.5em;
+      color: #4caf50;
+      border-radius: 15px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.4);
+      animation: popin 0.6s ease-in-out;
+      z-index: 1000;
+    }
+
+    @keyframes popin {
+      from { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+      to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+
+    #music-button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 1em;
+      border: none;
+      background-color: #2196f3;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #music-button:hover {
+      background-color: #1976d2;
+    }
+
+    footer {
+      margin-top: 50px;
+      font-size: 1em;
+      color: #555;
+    }
+  </style>
+</head>
+<body onclick="startMusic()">
+
+  <h1>Hangman</h1>
+  <p>Guess the word:</p>
+  <div id="word">_ _ _ _ _</div>
+  <div id="letters"></div>
+  <div id="feedback"></div>
+  <div id="status"></div>
+  <button id="play-again" onclick="resetGame()">🔁 Play Again</button>
+
+  <div id="popup">🎉 Congratulations! You guessed it right! 🎊</div>
+  <button id="music-button" onclick="toggleMusic()">Turn Music Off</button>
+
+  <footer>By Sreevalsan Sengupta</footer>
+
+  <!-- Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+
+  <!-- Audio -->
+  <audio id="bg-music" loop>
+    <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mp3">
+  </audio>
+  <audio id="win-sound">
+    <source src="https://www.myinstants.com/media/sounds/tada-fanfare.mp3" type="audio/mp3">
+  </audio>
+  <audio id="fail-sound">
+    <source src="https://www.myinstants.com/media/sounds/wrong-answer.mp3" type="audio/mp3">
+  </audio>
+
+  <script>
+    const easyWords = ["apple", "train", "robot", "chair", "dream"];
+    const hardWords = ["synergy", "quantum", "awkward", "zephyr", "oxygen"];
+    let usedWords = [];
+    let word = "";
+    let guessed = [];
+    let mistakes = 0;
+    const maxMistakes = 6;
+
+    const wordDiv = document.getElementById("word");
+    const feedback = document.getElementById("feedback");
+    const status = document.getElementById("status");
+    const playAgainBtn = document.getElementById("play-again");
+    const popup = document.getElementById("popup");
+    const musicButton = document.getElementById("music-button");
+
+    const bgMusic = document.getElementById("bg-music");
+    const winSound = document.getElementById("win-sound");
+    const failSound = document.getElementById("fail-sound");
+
+    let musicStarted = false;
+    let soundEnabled = true;
+
+    function startMusic() {
+      if (!musicStarted) {
+        bgMusic.play();
+        musicStarted = true;
+      }
+    }
+
+    function toggleMusic() {
+      if (bgMusic.paused) {
+        bgMusic.play();
+        soundEnabled = true;
+        musicButton.textContent = "Turn Music Off";
+      } else {
+        bgMusic.pause();
+        soundEnabled = false;
+        musicButton.textContent = "Turn Music On";
+      }
+    }
+
+    function getRandomWord() {
+      let allWords = [...easyWords, ...hardWords];
+      let unused = allWords.filter(w => !usedWords.includes(w));
+      if (unused.length === 0) usedWords = [];
+
+      const isHard = Math.random() > 0.5;
+      const pool = isHard ? hardWords : easyWords;
+      const filtered = pool.filter(w => !usedWords.includes(w));
+
+      const chosen = filtered.length > 0
+        ? filtered[Math.floor(Math.random() * filtered.length)]
+        : allWords[Math.floor(Math.random() * allWords.length)];
+
+      usedWords.push(chosen);
+      return chosen;
+    }
+
+    function updateWord() {
+      const display = word.split('').map(letter => guessed.includes(letter) ? letter : "_").join(' ');
+      wordDiv.textContent = display;
+
+      if (!display.includes("_")) {
+        status.textContent = "🎉 You won!";
+        feedback.textContent = "";
+        showPopup();
+        if (soundEnabled) winSound.play();
+        confettiEffect();
+        disableButtons();
+        playAgainBtn.style.display = "inline-block";
+      }
+    }
+
+    function createLetterButtons() {
+      const lettersDiv = document.getElementById("letters");
+      lettersDiv.innerHTML = "";
+      for (let i = 65; i <= 90; i++) {
+        const btn = document.createElement("button");
+        btn.textContent = String.fromCharCode(i);
+        btn.onclick = () => guessLetter(btn.textContent.toLowerCase(), btn);
+        lettersDiv.appendChild(btn);
+      }
+    }
+
+    function guessLetter(letter, btn) {
+      btn.disabled = true;
+
+      if (word.includes(letter)) {
+        guessed.push(letter);
+        feedback.textContent = "";
+      } else {
+        mistakes++;
+        if (mistakes <= 5) {
+          feedback.textContent = `No, wrong letter! (${mistakes} wrong)`;
+        }
+        if (mistakes >= maxMistakes) {
+          status.textContent = `💀 Game Over! The word was "${word}".`;
+          feedback.textContent = "";
+          if (soundEnabled) failSound.play();
+          disableButtons();
+          playAgainBtn.style.display = "inline-block";
+        }
+      }
+
+      updateWord();
+    }
+
+    function disableButtons() {
+      document.querySelectorAll("#letters button").forEach(btn => btn.disabled = true);
+    }
+
+    function showPopup() {
+      popup.style.display = "block";
+      setTimeout(() => {
+        popup.style.display = "none";
+      }, 3500);
+    }
+
+    function confettiEffect() {
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    }
+
+    function resetGame() {
+      word = getRandomWord();
+      guessed = [];
+      mistakes = 0;
+      status.textContent = "";
+      feedback.textContent = "";
+      popup.style.display = "none";
+      playAgainBtn.style.display = "none";
+      createLetterButtons();
+      updateWord();
+    }
+
+    resetGame();
+  </script>
+
+</body>
+</html>
